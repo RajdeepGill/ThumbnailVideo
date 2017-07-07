@@ -30,14 +30,15 @@ class Download {
 	protected function getExtention($url){
 		if($this->checkURL($url)){
 			$end = end(preg_split("/[.]+/", $url));
-				if(isset($end)){
-					return $end;
-				}
+			if(isset($end)){
+				return $end;
+			}
 		}
 	}
 
 	//Download Video File
 	public function downloadFile($url){
+		ini_set('memory_limit', "512M");
 		if($this->cleanURL($url)){
 			$extension = $this->getExtention($url);
 			if ($extension) {
@@ -53,11 +54,28 @@ class Download {
 				fputs($file, $return);
 				if (fclose($file)) {
 					echo "Video Downloaded";
+					
+					// $ffmpeg = "/usr/local/Cellar/ffmpeg/3.3.2/bin/ffmpeg";
 
-					$thumbnail = 'thumbnails/thumbnail.jpg';
+					// where ffmpeg is located  
+					$ffmpeg = '/usr/local/Cellar/ffmpeg/3.3.2/bin/ffmpeg';  
+					//video dir  
+					$video = $destination;  
+					//where to save the image  
+					$image = 'thumbnails/image.jpg';  
+					//time to take screenshot at  
+					$interval = 1;
+					//screenshot size  
+					$size = '640x480';  
+					//ffmpeg command  
+					$cmd = "$ffmpeg -i $video -deinterlace -an -ss $interval -f mjpeg -t 1 -r 1 -y -s $size $image 2>&1";
 
-					// shell command [highly simplified, please don't run it plain on your script!]
-					shell_exec("ffmpeg -i $file -deinterlace -an -ss 1 -t 00:00:01 -r 1 -y -vcodec mjpeg -f mjpeg $thumbnail 2>&1");
+					exec($cmd);
+    				header( "refresh:2;" );
+					// $thumbnail = 'thumbnails/thumbnail.jpg';
+
+					// // shell command [highly simplified, please don't run it plain on your script!]
+					// shell_exec("ffmpeg -i $file -deinterlace -an -ss 1 -t 00:00:01 -r 1 -y -vcodec mjpeg -f mjpeg $thumbnail 2>&1");
 				}
 			}
 		}
@@ -75,6 +93,7 @@ if (isset($_POST['url'])) {
 	<input type="submit" value="Download">
 </form>
 
+<img src="thumbnails/image.jpg?=<?php echo filemtime($filename)?>">
 <?php
 if (isset($url)) {
 	$obj->downloadFile($url);
