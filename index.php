@@ -1,6 +1,59 @@
-<?php
-class Download {
+<!doctype html>
+<head>
+<meta charset="utf-8">
 
+<title>Thumbnail Video.</title>
+
+<script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+<meta name="description" content="MCS Programming Question - Thumbnail Video.">
+<meta name="author" content="Rajdeep Gill">
+</head>
+
+<body>
+
+<div class="container">
+	<form class="form-signin" action="http://localhost/index.php" method="post">
+    <h2 class="form-signin-heading">Please enter video URL</h2>
+    <div class="input-group">
+		<input type="text" name="url" class="form-control" placeholder="Video address" required="" autofocus="">
+		<span class="input-group-btn">
+        	<button class="btn btn-default" type="submit">Download!</button>
+      	</span>
+    </div><!-- /input-group -->
+	</form>
+    <div  class="thumbnail">
+      <img id="myThumnail" src="thumbnails/image.jpg?=<?php echo filemtime($filename)?>" alt="...">
+    </div>
+    <div class="progress">
+    	<div id="theprogressbar" class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0">0% Complete
+  		</div>
+  	</div>
+</div> <!-- /container -->
+
+
+
+
+
+<?php
+
+//If URL is entered begen process
+if (isset($_POST['url'])) {
+	$obj = new Download();
+	$url = $_POST['url'];
+	if (isset($url)) {
+		$obj->downloadFile($url);
+	}
+}
+
+
+class Download {
 	const MAX_URL_LENGTH = 1050;
 	//Clean URL
 	protected function cleanURL($url){
@@ -13,7 +66,7 @@ class Download {
 		}
 	}
 
-	//Check URL
+	//Check URL Validity
 	protected function checkURL($url){
 		$url = $this->cleanURL($url);
 		if(isset($url)){
@@ -21,12 +74,14 @@ class Download {
 				return $url;
 			}
 			else{
-				echo "not a valid URL";
+				echo '<div class="alert alert-danger alert-dismissible" role="alert">
+					<button type="button" class="close" data-dismiss="alert" aria-label="Close">
+					<span aria-hidden="true">&times;</span></button>not a valid URL</div>';
 			}
 		}
 	}
 
-	//Get extension
+	//Get video extension
 	protected function getExtention($url){
 		if($this->checkURL($url)){
 			$end = end(preg_split("/[.]+/", $url));
@@ -36,25 +91,39 @@ class Download {
 		}
 	}
 
+	//Updates video download progress bar
+	public function progress($resource,$download_size, $downloaded, $upload_size, $uploaded)
+	{
+		if($download_size > 0) {
+			$percentageVal = round( ($downloaded / $download_size  * 100), 2);
+			echo "<script>$('#theprogressbar').attr('aria-valuenow', $percentageVal).css('width',$percentageVal+'%');</script>";
+			echo "<script>$('#theprogressbar').text($percentageVal + '% Complete');</script>";
+		}
+	}
+
 	//Download Video File
 	public function downloadFile($url){
 		ini_set('memory_limit', "512M");
-		if($this->cleanURL($url)){
+		// if($this->cleanURL($url)){
 			$extension = $this->getExtention($url);
 			if ($extension) {
 				//echo $url;
+				$destination = "downloads/video.$extension";// Set video download destination
+
+				$file = fopen($destination, "w+");
+
 				$ch = curl_init();
 				curl_setopt($ch, CURLOPT_URL, $url);
+				curl_setopt( $ch, CURLOPT_FILE, $file );
+				curl_setopt( $ch, CURLOPT_NOPROGRESS, false );
+				curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, array($this, 'progress'));
 				curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 				$return = curl_exec($ch);
 				curl_close($ch);
 
-				$destination = "downloads/video.$extension";
-				$file = fopen($destination, "w+");
 				fputs($file, $return);
 				if (fclose($file)) {
-					echo "Video Downloaded";
-					
+					// echo "Video Downloaded";
 					// $ffmpeg = "/usr/local/Cellar/ffmpeg/3.3.2/bin/ffmpeg";
 
 					// where ffmpeg is located  
@@ -64,14 +133,15 @@ class Download {
 					//where to save the image  
 					$image = 'thumbnails/image.jpg';  
 					//time to take screenshot at  
-					$interval = 1;
+					$interval = 5;
 					//screenshot size  
 					$size = '640x480';  
 					//ffmpeg command  
 					$cmd = "$ffmpeg -i $video -deinterlace -an -ss $interval -f mjpeg -t 1 -r 1 -y -s $size $image 2>&1";
 
 					exec($cmd);
-    				header( "refresh:2;" );
+					echo "<script>$('#myThumnail').attr('src', 'thumbnails/image.jpg?=<?php echo filemtime($filename)?>');</script>";
+    				// header( "refresh:2;" );
 					// $thumbnail = 'thumbnails/thumbnail.jpg';
 
 					// // shell command [highly simplified, please don't run it plain on your script!]
@@ -79,25 +149,9 @@ class Download {
 				}
 			}
 		}
-	}
-
-}
-
-$obj = new Download();
-if (isset($_POST['url'])) {
-	$url = $_POST['url'];
+	// }
 }
 ?>
-<form action="http://localhost/index.php" method="post">
-	<input type="text" name="url" maxlength="1000">
-	<input type="submit" value="Download">
-</form>
 
-<img src="thumbnails/image.jpg?=<?php echo filemtime($filename)?>">
-<?php
-if (isset($url)) {
-	$obj->downloadFile($url);
-}
-
-
-?>
+</body>
+</html>
