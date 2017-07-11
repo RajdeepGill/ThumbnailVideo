@@ -28,8 +28,9 @@
       	</span>
     </div><!-- /input-group -->
 	</form>
+	<br>
     <div  class="thumbnail">
-      <img id="myThumnail" src="thumbnails/image.jpg?=<?php echo filemtime($filename)?>" alt="...">
+      <img id="myThumnail" src="thumbnails/image.jpg?=<?php echo filemtime($filename)?>" alt="thumbnail">
     </div>
     <div class="progress">
     	<div id="theprogressbar" class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0">0% Complete
@@ -45,33 +46,26 @@
 
 //If URL is entered begen process
 if (isset($_POST['url'])) {
-	$obj = new Download();
 	$url = $_POST['url'];
-	if (isset($url)) {
-		$obj->downloadFile($url);
-	}
+	$obj = new Download($url);
+	$obj->downloadFile();
 }
 
 
 class Download {
 	const MAX_URL_LENGTH = 1050;
-	//Clean URL
-	protected function cleanURL($url){
-		if(isset($url)){
-			if(!empty($url)){
-				if(strlen($url) < self::MAX_URL_LENGTH){
-					return strip_tags($url);
-				}
-			}
-		}
-	}
+	protected $url;
+	protected $videoLocation;
+
+  	public function __construct($url) {
+    	$this->url = $url;
+  	}
 
 	//Check URL Validity
-	protected function checkURL($url){
-		$url = $this->cleanURL($url);
-		if(isset($url)){
-			if(filter_var($url, FILTER_VALIDATE_URL, FILTER_FLAG_PATH_REQUIRED)){
-				return $url;
+	protected function checkURL(){
+		if(isset($this->url)){
+			if(filter_var($this->url, FILTER_VALIDATE_URL, FILTER_FLAG_PATH_REQUIRED)){
+				return true;
 			}
 			else{
 				echo '<div class="alert alert-danger alert-dismissible" role="alert">
@@ -82,17 +76,15 @@ class Download {
 	}
 
 	//Get video extension
-	protected function getExtention($url){
-		if($this->checkURL($url)){
-			$end = end(preg_split("/[.]+/", $url));
-			if(isset($end)){
-				return $end;
-			}
+	protected function getExtention(){
+		$end = end(preg_split("/[.]+/", $this->url));
+		if(isset($end)){
+			return $end;
 		}
 	}
 
 	//Updates video download progress bar
-	public function progress($resource,$download_size, $downloaded, $upload_size, $uploaded)
+	protected function progress($resource,$download_size, $downloaded, $upload_size, $uploaded)
 	{
 		if($download_size > 0) {
 			$percentageVal = round( ($downloaded / $download_size  * 100), 2);
@@ -102,54 +94,44 @@ class Download {
 	}
 
 	//Download Video File
-	public function downloadFile($url){
+	public function downloadFile(){
 		ini_set('memory_limit', "512M");
-		// if($this->cleanURL($url)){
-			$extension = $this->getExtention($url);
+		$extension = $this->getExtention();
 			if ($extension) {
 				//echo $url;
-				$destination = "downloads/video.$extension";// Set video download destination
-
-				$file = fopen($destination, "w+");
-
+				$this->videoLocation = "downloads/video.$extension";// Set video download destination
+				$file = fopen($this->videoLocation, "w+");
 				$ch = curl_init();
-				curl_setopt($ch, CURLOPT_URL, $url);
+				curl_setopt($ch, CURLOPT_URL, $this->url);
 				curl_setopt( $ch, CURLOPT_FILE, $file );
 				curl_setopt( $ch, CURLOPT_NOPROGRESS, false );
 				curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, array($this, 'progress'));
 				curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 				$return = curl_exec($ch);
 				curl_close($ch);
-
 				fputs($file, $return);
-				if (fclose($file)) {
-					// echo "Video Downloaded";
-					// $ffmpeg = "/usr/local/Cellar/ffmpeg/3.3.2/bin/ffmpeg";
-
-					// where ffmpeg is located  
-					$ffmpeg = '/usr/local/Cellar/ffmpeg/3.3.2/bin/ffmpeg';  
-					//video dir  
-					$video = $destination;  
-					//where to save the image  
-					$image = 'thumbnails/image.jpg';  
-					//time to take screenshot at  
-					$interval = 5;
-					//screenshot size  
-					$size = '640x480';  
-					//ffmpeg command  
-					$cmd = "$ffmpeg -i $video -deinterlace -an -ss $interval -f mjpeg -t 1 -r 1 -y -s $size $image 2>&1";
-
-					exec($cmd);
-					echo "<script>$('#myThumnail').attr('src', 'thumbnails/image.jpg?=<?php echo filemtime($filename)?>');</script>";
-    				// header( "refresh:2;" );
-					// $thumbnail = 'thumbnails/thumbnail.jpg';
-
-					// // shell command [highly simplified, please don't run it plain on your script!]
-					// shell_exec("ffmpeg -i $file -deinterlace -an -ss 1 -t 00:00:01 -r 1 -y -vcodec mjpeg -f mjpeg $thumbnail 2>&1");
-				}
+				fclose($file);
+				$this->createThumbnail();
 			}
-		}
-	// }
+	}
+
+	//Create Thumbnail
+	protected function createThumbnail(){
+		// where ffmpeg is located  
+		$ffmpeg = '/usr/local/Cellar/ffmpeg/3.3.2/bin/ffmpeg';  
+		//video dir  
+		$video = $this->videoLocation;  
+		//where to save the image  
+		$image = 'thumbnails/image.jpg';  
+		//time to take screenshot at  
+		$interval = 5;
+		//screenshot size  
+		//ffmpeg command  
+		$cmd = "$ffmpeg -i $video -ss $interval -f mjpeg -t 1 -r 1 -y $image 2>&1";
+
+		exec($cmd);
+		echo "<script>$('#myThumnail').attr('src', 'thumbnails/image.jpg?=<?php echo filemtime($filename)?>');</script>";
+	}
 }
 ?>
 
